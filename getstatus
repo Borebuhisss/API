@@ -1,0 +1,28 @@
+while true do
+    local success, response = pcall(function()
+        return http_request({
+            Url = 'https://testerss.pythonanywhere.com/activeget',
+            Method = 'GET',
+            Headers = {
+                ['Content-Type'] = 'application/json'
+            },
+        })
+    end)
+    
+    if success then
+        local responseBody = response.Body
+        -- Парсим JSON-ответ
+        local responseData = game:GetService("HttpService"):JSONDecode(responseBody)
+        
+        -- Проверяем значение status
+        if responseData.status == "false" then
+            print("Status is false")
+        else
+            print("Status is not false")
+        end
+        break
+    else
+        warn("Request failed:", response)
+        return nil
+    end
+end
